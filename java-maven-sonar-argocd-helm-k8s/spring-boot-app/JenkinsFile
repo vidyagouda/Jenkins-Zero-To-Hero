@@ -1,33 +1,44 @@
 pipeline {
-  agent {
-    docker {
-      image 'vidyagouda/maven-abhishek-docker-agent:v1'
-      args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket to access the host's Docker daemon
+    agent {
+        docker {
+            image 'vidyagouda/maven-abhishek-docker-agent:v1'
+            args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket to access host's Docker daemon
+        }
     }
-  }
-  stages {
-    stage('Checkout') {
-      steps {
-        sh 'echo passed'
-        //git branch: 'main', url: 'https://github.com/vidyagouda/Jenkins-Zero-To-Hero.git'
-      }
-    }
-    stage('Build and Test') {
-      steps {
-        sh 'ls -ltr'
-        // build the project and create a JAR file
-        sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
-      }
-    }
-   
-    stage('Build and Push Docker Image') {
-      environment {
+
+    environment {
         DOCKER_IMAGE = "vidyagouda/ultimate-cicd:${BUILD_NUMBER}"
-        // DOCKERFILE_LOCATION = "java-maven-sonar-argocd-helm-k8s/spring-boot-app/Dockerfile"
         REGISTRY_CREDENTIALS = credentials('docker-cred')
-      }
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                sh 'echo "Starting the pipeline: Checking out the repository"'
+                git branch: 'main', url: 'https://github.com/vidyagouda/Jenkins-Zero-To-Hero.git'
+            }
+        }
+
+        stage('Build and Test') {
+            steps {
+                sh 'echo "Listing files:"'
+                sh 'ls -ltr'
+                // Build the project and create a JAR file
+                sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
+            }
+        }
+
+        stage('Build and Push Docker Image') {
+            steps {
+                script {
+                    sh 'echo "Building Docker image..."'
+                    sh """
+                    docker build -t $DOCKER_IMAGE java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                    docker login -u ${REGISTRY_CREDENTIALS_USR} -p ${REGISTRY_CREDENTIALS_PSW}
+                    docker push $DOCKER_IMAGE
+                    """
+                }
+            }
+        }
     }
 }
-}
-   
- 
